@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Event Management System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('index') }}">events</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        {% if session.get('user_id') %}
+            {% if not session.get('is_admin') %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('my_registrations') }}">My Registrations</a></li>
+            {% endif %}
+            {% if session.get('is_admin') %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+            {% endif %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+        {% else %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('register') }}">Register</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-info">
+                {% for msg in messages %} <div>{{ msg }}</div> {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- HOME -->
+    {% if page == 'index' %}
+        <h2>Upcoming Events</h2>
+        {% for event in events %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">{{ event.title }}</h5>
+                    <p class="card-text">{{ event.description }}</p>
+                    <p><strong>Location:</strong> {{ event.location or '—' }}</p>
+                    <p><strong>Start:</strong> {{ event.start_datetime|display_dt }} |
+                       <strong>End:</strong> {{ event.end_datetime|display_dt }}</p>
+                    <a href="{{ url_for('event_detail', event_id=event.id) }}" class="btn btn-primary">View / Register</a>
+                </div>
+            </div>
+        {% else %}
+            <p>No events available.</p>
+        {% endfor %}
+    {% endif %}
+
+    <!-- REGISTER -->
+    {% if page == 'register' %}
+        <h2>User Registration</h2>
+        <form method="POST">
+            <div class="mb-3"><label>Name</label><input type="text" name="name" class="form-control" required></div>
+            <div class="mb-3"><label>Email</label><input type="email" name="email" class="form-control" required></div>
+            <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
+            <button class="btn btn-success">Register</button>
+        </form>
+    {% endif %}
+
+    <!-- LOGIN -->
+    {% if page == 'login' %}
+        <h2>User Login</h2>
+        <form method="POST">
+            <div class="mb-3"><label>Email</label><input type="email" name="email" class="form-control" required></div>
+            <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
+            <button class="btn btn-primary">Login</button>
+        </form>
+    {% endif %}
+
+    <!-- EVENT DETAIL -->
+    {% if page == 'event_detail' %}
+        <h2>{{ event.title }}</h2>
+        <p>{{ event.description }}</p>
+        <p><strong>Location:</strong> {{ event.location or '—' }}</p>
+        <p><strong>Start:</strong> {{ event.start_datetime|display_dt }} |
+           <strong>End:</strong> {{ event.end_datetime|display_dt }}</p>
+
+        {% if session.get('user_id') %}
+            {% if user_registered %}
+                <button class="btn btn-secondary" disabled>Already Registered</button>
+            {% else %}
+                <form method="POST"><button class="btn btn-success">Register for Event</button></form>
+            {% endif %}
+        {% else %}
+            <p><a href="{{ url_for('login') }}">Login</a> to register.</p>
+        {% endif %}
+    {% endif %}
+
+    <!-- MY REGISTRATIONS -->
+    {% if page == 'my_registrations' %}
+        <h2>My Registrations</h2>
+        {% for event in registrations %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5>{{ event.title }}</h5>
+                    <p>{{ event.description }}</p>
+                    <p><strong>Location:</strong> {{ event.location or '—' }}</p>
+                    <p><strong>Start:</strong> {{ event.start_datetime|display_dt }} |
+                       <strong>End:</strong> {{ event.end_datetime|display_dt }}</p>
+                </div>
+            </div>
+        {% else %}
+            <p>You have not registered for any events.</p>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ADMIN DASHBOARD -->
+    {% if page == 'admin_dashboard' %}
+        <h2>Admin Dashboard</h2>
+        <a href="{{ url_for('admin_event_form') }}" class="btn btn-success mb-3">Add New Event</a>
+        {% for event in events %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5>{{ event.title }}</h5>
+                    <p>{{ event.description }}</p>
+                    <p><strong>Location:</strong> {{ event.location or '—' }}</p>
+                    <p><strong>Start:</strong> {{ event.start_datetime|display_dt }} |
+                       <strong>End:</strong> {{ event.end_datetime|display_dt }}</p>
+                    <p><strong>Approved:</strong> {{ 'Yes' if event.approved else 'No' }}</p>
+                    <p><strong>Registered:</strong> {{ event.registered_count }}</p>
+
+                    <a href="{{ url_for('admin_event_form', event_id=event.id) }}" class="btn btn-primary">Edit</a>
+
+                    <!-- NEW: view registrations button -->
+                    <a href="{{ url_for('admin_event_registrations', event_id=event.id) }}" class="btn btn-info">View Registrations</a>
+
+                    <form method="POST" action="{{ url_for('admin_delete_event', event_id=event.id) }}" style="display:inline-block;">
+                        <button class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        {% else %}
+            <p>No events yet.</p>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ADMIN EVENT REGISTRATIONS -->
+    {% if page == 'admin_event_registrations' %}
+        <h2>Registrations for: {{ event.title }}</h2>
+        <p>{{ event.description }}</p>
+        <p><strong>Location:</strong> {{ event.location or '—' }}</p>
+        <p><strong>Start:</strong> {{ event.start_datetime|display_dt }} | <strong>End:</strong> {{ event.end_datetime|display_dt }}</p>
+        <p><strong>Total Registered:</strong> {{ reg_count }}</p>
+
+        {% if registrants %}
+            <table class="table">
+                <thead>
+                    <tr><th>#</th><th>Name</th><th>Email</th></tr>
+                </thead>
+                <tbody>
+                    {% for u in registrants %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ u.name }}</td>
+                            <td>{{ u.email }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No one has registered for this event yet.</p>
+        {% endif %}
+
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Admin Dashboard</a>
+    {% endif %}
+
+    <!-- ADMIN ADD/EDIT FORM -->
+    {% if page == 'admin_event_form' %}
+        <h2>{{ 'Edit Event' if event else 'Add Event' }}</h2>
+        <form method="POST">
+            <div class="mb-3"><label>Title</label><input type="text" name="title" class="form-control" value="{{ event.title if event else '' }}" required></div>
+            <div class="mb-3"><label>Description</label><textarea name="description" class="form-control" required>{{ event.description if event else '' }}</textarea></div>
+            <div class="mb-3"><label>Location</label><input type="text" name="location" class="form-control" value="{{ event.location if event else '' }}" required></div>
+
+            <div class="mb-3"><label>Start Date & Time</label>
+                <input type="datetime-local" name="start_datetime" class="form-control"
+                       value="{{ event.start_datetime.strftime('%Y-%m-%dT%H:%M') if event and event.start_datetime else '' }}" required>
+            </div>
+            <div class="mb-3"><label>End Date & Time</label>
+                <input type="datetime-local" name="end_datetime" class="form-control"
+                       value="{{ event.end_datetime.strftime('%Y-%m-%dT%H:%M') if event and event.end_datetime else '' }}" required>
+            </div>
+
+            <div class="mb-3"><label>Capacity</label><input type="number" name="capacity" class="form-control" value="{{ event.capacity if event else '' }}"></div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" name="approved" class="form-check-input" {% if event and event.approved %}checked{% endif %}>
+                <label class="form-check-label">Approved (visible on homepage)</label>
+            </div>
+            <button class="btn btn-success">{{ 'Update' if event else 'Add' }}</button>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back</a>
+        </form>
+    {% endif %}
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
